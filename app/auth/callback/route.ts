@@ -64,23 +64,43 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
 
       if (!membership) {
-        const familyId = crypto.randomUUID();
-        const { error: familyError } = await supabase
-          .from("families")
-          .insert({
-            id: familyId,
-            name: "Our Family",
-            baby_name: "Aniya",
-            created_by: user.id,
-          });
+        // Check for pending invitation
+        const { data: invite } = await supabase
+          .from("family_members")
+          .select("id")
+          .eq("invited_email", user.email?.toLowerCase() ?? "")
+          .is("user_id", null)
+          .maybeSingle();
 
-        if (!familyError) {
-          await supabase.from("family_members").insert({
-            family_id: familyId,
-            user_id: user.id,
-            role: "owner",
-            joined_at: new Date().toISOString(),
-          });
+        if (invite) {
+          // Join the existing family
+          await supabase
+            .from("family_members")
+            .update({
+              user_id: user.id,
+              joined_at: new Date().toISOString(),
+            })
+            .eq("id", invite.id);
+        } else {
+          // Create a new family
+          const familyId = crypto.randomUUID();
+          const { error: familyError } = await supabase
+            .from("families")
+            .insert({
+              id: familyId,
+              name: "Our Family",
+              baby_name: "Aniya",
+              created_by: user.id,
+            });
+
+          if (!familyError) {
+            await supabase.from("family_members").insert({
+              family_id: familyId,
+              user_id: user.id,
+              role: "owner",
+              joined_at: new Date().toISOString(),
+            });
+          }
         }
       }
     }

@@ -94,6 +94,33 @@ export async function signupAction(
     };
   }
 
+  // Check for pending invitation first
+  const { data: invite } = await supabase
+    .from("family_members")
+    .select("id")
+    .eq("invited_email", email.toLowerCase())
+    .is("user_id", null)
+    .maybeSingle();
+
+  if (invite) {
+    const { error: claimError } = await supabase
+      .from("family_members")
+      .update({
+        user_id: userId,
+        joined_at: new Date().toISOString(),
+      })
+      .eq("id", invite.id);
+
+    if (claimError) {
+      return {
+        ok: false,
+        error: `Could not accept invitation: ${claimError.message}`,
+      };
+    }
+
+    redirect("/timeline");
+  }
+
   const familyId = crypto.randomUUID();
   // Create family + owner membership. RLS requires auth.uid() = created_by.
   const { error: familyError } = await supabase
@@ -156,6 +183,33 @@ export async function completeSetupAction(): Promise<SignupState> {
 
   if (existingMembership) {
     // Already set up — just send them in.
+    redirect("/timeline");
+  }
+
+  // Check for pending invitation
+  const { data: invite } = await supabase
+    .from("family_members")
+    .select("id")
+    .eq("invited_email", user.email?.toLowerCase() ?? "")
+    .is("user_id", null)
+    .maybeSingle();
+
+  if (invite) {
+    const { error: claimError } = await supabase
+      .from("family_members")
+      .update({
+        user_id: user.id,
+        joined_at: new Date().toISOString(),
+      })
+      .eq("id", invite.id);
+
+    if (claimError) {
+      return {
+        ok: false,
+        error: `Could not accept invitation: ${claimError.message}`,
+      };
+    }
+
     redirect("/timeline");
   }
 
