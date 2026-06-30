@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+:root {
+  /* Soft baby-friendly palette */
+  --background: #fff8f5;
+  --foreground: #3d2c2e;
+  --primary: #f4a5b8;          /* soft pink */
+  --primary-dark: #e07a93;
+  --accent: #a8d8ea;           /* sky blue */
+  --accent-2: #c5e8c8;         /* mint */
+  --accent-3: #ffe5b4;         /* peach */
+  --muted: #fdf2ed;
+  --border: #f1d9d4;
+  --card: #ffffff;
+  --shadow: 0 6px 24px -8px rgba(244, 165, 184, 0.25);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-3: var(--accent-3);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --font-sans: var(--font-geist-sans);
+  --font-script: var(--font-script);
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+}
+
+/* Smooth fade-in for cards */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.4s ease-out both; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* Heart pulse for the timeline dots */
+@keyframes heartPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+.heart-pulse { animation: heartPulse 1.6s ease-in-out infinite; }
+
+/* Utility classes for the pastel theme */
+.bg-soft-gradient {
+  background: linear-gradient(180deg, #fff8f5 0%, #fff0e9 100%);
+}
+.text-balance { text-wrap: balance; }
