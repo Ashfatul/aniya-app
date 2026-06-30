@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type SignupState =
   | { ok: true }
-  | { ok: false; error: string }
+  | { ok: false; error: string; needsConfirmation?: boolean; email?: string }
   | null;
 
 export async function signupAction(
@@ -30,14 +30,40 @@ export async function signupAction(
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // "already registered" — point them at the login page.
+    if (/already registered|already been registered/i.test(error.message)) {
+      return {
+        ok: false,
+        error:
+          "That email is already registered. Try signing in instead.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
 
   const userId = data.user?.id;
   if (!userId) {
-    return { ok: false, error: "Account created but sign-in failed. Try logging in." };
+    return {
+      ok: false,
+      error: "Account created but sign-in failed. Try logging in.",
+    };
   }
 
-  // Create family + owner membership.
+  // If Supabase email confirmation is ON, no session is issued yet.
+  // We can't create family/membership because RLS would block them
+  // (auth.uid() isn't set until the user clicks the confirmation email).
+  if (!data.session) {
+    return {
+      ok: false,
+      needsConfirmation: true,
+      email,
+      error:
+        "Check your inbox to confirm your email, then sign in to finish setting up.",
+    };
+  }
+
+  // Create family + owner membership. RLS requires auth.uid() = created_by.
   const { data: family, error: familyError } = await supabase
     .from("families")
     .insert({
@@ -48,11 +74,15 @@ export async function signupAction(
     .select()
     .single();
 
-  if (familyError || !family) {
+  if (familyError) {
+    // Surface the real RLS / schema error so it's debuggable.
     return {
       ok: false,
-      error: "Failed to create family. Please try again.",
+      error: `Could not create family: ${familyError.message}`,
     };
+  }
+  if (!family) {
+    return { ok: false, error: "Failed to create family. Please try again." };
   }
 
   const { error: memberError } = await supabase.from("family_members").insert({
@@ -63,10 +93,12 @@ export async function signupAction(
   });
 
   if (memberError) {
-    return { ok: false, error: "Failed to set up your membership." };
+    return {
+      ok: false,
+      error: `Failed to set up your membership: ${memberError.message}`,
+    };
   }
 
-  // Auto-login: Supabase sends a confirmation email if enabled. On local dev,
-  // confirm-email is usually disabled and the session is set immediately.
+  // Auto-login: cookies are set by createServerClient above on success.
   redirect("/timeline");
 }

@@ -14,6 +14,10 @@ export default function SignupPage() {
   const [state, formAction, pending] = useActionState(signupAction, initialState);
 
   const error = state && !state.ok ? state.error : null;
+  const needsConfirmation =
+    state && !state.ok && "needsConfirmation" in state
+      ? state.needsConfirmation
+      : false;
 
   return (
     <Card className="w-full max-w-md p-8 fade-up">
@@ -87,7 +91,13 @@ export default function SignupPage() {
         </div>
 
         {error && (
-          <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 text-red-700 text-sm">
+          <div
+            className={`flex items-start gap-2 p-3 rounded-xl text-sm ${
+              needsConfirmation
+                ? "bg-amber-50 text-amber-800"
+                : "bg-red-50 text-red-700"
+            }`}
+          >
             <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
