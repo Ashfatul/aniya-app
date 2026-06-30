@@ -3,6 +3,7 @@
 
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,6 +11,28 @@ export type SignupState =
   | { ok: true }
   | { ok: false; error: string; needsConfirmation?: boolean; email?: string }
   | null;
+
+/**
+ * Resolves the request's origin so the Supabase email-confirmation link
+ * points to wherever the user actually signed up from. Without this,
+ * the link always points to the Site URL configured in the Supabase
+ * dashboard (often localhost), and the user can't complete verification
+ * on the live site.
+ */
+async function getRequestOrigin(): Promise<string> {
+  const h = await headers();
+  const xfHost = h.get("x-forwarded-host");
+  const xfProto = h.get("x-forwarded-proto") ?? "https";
+  const host = h.get("host");
+  if (xfHost) return `${xfProto}://${xfHost}`;
+  if (host) {
+    // Local dev is http; everything else (vercel/preview) goes via the
+    // x-forwarded-* headers above, but be defensive.
+    const proto = host.startsWith("localhost") ? "http" : "https";
+    return `${proto}://${host}`;
+  }
+  return "http://localhost:3000";
+}
 
 export async function signupAction(
   _prev: SignupState,
@@ -29,14 +52,20 @@ export async function signupAction(
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const origin = await getRequestOrigin();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${origin}/auth/callback?next=/timeline`,
+    },
+  });
   if (error) {
     // "already registered" — point them at the login page.
     if (/already registered|already been registered/i.test(error.message)) {
       return {
         ok: false,
-        error:
-          "That email is already registered. Try signing in instead.",
+        error: "That email is already registered. Try signing in instead.",
       };
     }
     return { ok: false, error: error.message };
@@ -51,15 +80,16 @@ export async function signupAction(
   }
 
   // If Supabase email confirmation is ON, no session is issued yet.
-  // We can't create family/membership because RLS would block them
+  // We can't create family/membership here because RLS would block them
   // (auth.uid() isn't set until the user clicks the confirmation email).
+  // The /auth/callback route will finish the setup on click-through.
   if (!data.session) {
     return {
       ok: false,
       needsConfirmation: true,
       email,
       error:
-        "Check your inbox to confirm your email, then sign in to finish setting up.",
+        "Check your inbox to confirm your email. We'll set up your memory book as soon as you click the link.",
     };
   }
 
@@ -75,7 +105,6 @@ export async function signupAction(
     .single();
 
   if (familyError) {
-    // Surface the real RLS / schema error so it's debuggable.
     return {
       ok: false,
       error: `Could not create family: ${familyError.message}`,
@@ -99,6 +128,5 @@ export async function signupAction(
     };
   }
 
-  // Auto-login: cookies are set by createServerClient above on success.
   redirect("/timeline");
 }

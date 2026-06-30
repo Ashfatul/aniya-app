@@ -21,11 +21,16 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/timeline";
+  const verifyError = params.get("error") === "verify";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    verifyError
+      ? "That confirmation link is invalid or has expired. Try signing in or signing up again."
+      : null
+  );
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
