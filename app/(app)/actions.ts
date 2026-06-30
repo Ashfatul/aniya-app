@@ -27,6 +27,16 @@ export async function updateFamilyAction(
 
   if (!name) return { ok: false, error: "Name is required." };
 
+  // Get active owner membership
+  const { data: membership } = await supabase
+    .from("family_members")
+    .select("family_id")
+    .eq("user_id", user.id)
+    .eq("role", "owner")
+    .maybeSingle();
+
+  if (!membership) return { ok: false, error: "Not authorized to update family." };
+
   const { error } = await supabase
     .from("families")
     .update({
@@ -35,7 +45,7 @@ export async function updateFamilyAction(
       baby_birthday: birthday,
       baby_photo_url: photoUrl,
     })
-    .eq("created_by", user.id);
+    .eq("id", membership.family_id);
 
   if (error) return { ok: false, error: error.message };
 
@@ -99,17 +109,17 @@ export async function inviteMemberAction(
   if (!["editor", "viewer"].includes(role))
     return { ok: false, error: "Invalid role." };
 
-  // Find my family
-  const { data: fam } = await supabase
-    .from("families")
-    .select("id")
-    .eq("created_by", user.id)
-    .limit(1)
+  // Find active family membership (must be owner to invite)
+  const { data: membership } = await supabase
+    .from("family_members")
+    .select("family_id")
+    .eq("user_id", user.id)
+    .eq("role", "owner")
     .maybeSingle();
-  if (!fam) return { ok: false, error: "You don't have a family yet." };
+  if (!membership) return { ok: false, error: "Not authorized to invite members." };
 
   const { error } = await supabase.from("family_members").insert({
-    family_id: fam.id,
+    family_id: membership.family_id,
     user_id: null,
     role,
     invited_email: email,

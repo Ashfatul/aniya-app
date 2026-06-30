@@ -16,14 +16,15 @@ export default async function TimelinePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Get family
-  const { data: family } = await supabase
-    .from("families")
-    .select("*")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle<Family>();
-  if (!family) redirect("/signup");
+  // Get family via membership
+  const { data: membership } = await supabase
+    .from("family_members")
+    .select("family:families(*)")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!membership || !membership.family) redirect("/signup");
+  const family = membership.family as unknown as Family;
 
   // Fetch timeline entries (RLS will scope to family automatically)
   const { data: entries } = await supabase

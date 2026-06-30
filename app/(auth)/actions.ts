@@ -6,6 +6,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import crypto from "crypto";
 
 export type SignupState =
   | { ok: true }
@@ -93,16 +94,16 @@ export async function signupAction(
     };
   }
 
+  const familyId = crypto.randomUUID();
   // Create family + owner membership. RLS requires auth.uid() = created_by.
-  const { data: family, error: familyError } = await supabase
+  const { error: familyError } = await supabase
     .from("families")
     .insert({
+      id: familyId,
       name: familyName,
       baby_name: babyName,
       created_by: userId,
-    })
-    .select()
-    .single();
+    });
 
   if (familyError) {
     return {
@@ -110,12 +111,9 @@ export async function signupAction(
       error: `Could not create family: ${familyError.message}`,
     };
   }
-  if (!family) {
-    return { ok: false, error: "Failed to create family. Please try again." };
-  }
 
   const { error: memberError } = await supabase.from("family_members").insert({
-    family_id: family.id,
+    family_id: familyId,
     user_id: userId,
     role: "owner",
     joined_at: new Date().toISOString(),
@@ -125,6 +123,70 @@ export async function signupAction(
     return {
       ok: false,
       error: `Failed to set up your membership: ${memberError.message}`,
+    };
+  }
+
+  redirect("/timeline");
+}
+
+/**
+ * Recovery action for users who already confirmed their email but never
+ * got a family created (e.g. the email-link callback hit a transient error,
+ * or they signed up with verification off and the family insert failed).
+ *
+ * Called from the /signup page when the user lands there but already has
+ * a valid session. Creates the family + owner membership if missing, then
+ * redirects to /timeline.
+ */
+export async function completeSetupAction(): Promise<SignupState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "Please sign in first." };
+  }
+
+  const { data: existingMembership } = await supabase
+    .from("family_members")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existingMembership) {
+    // Already set up — just send them in.
+    redirect("/timeline");
+  }
+
+  const familyId = crypto.randomUUID();
+  const { error: familyError } = await supabase
+    .from("families")
+    .insert({
+      id: familyId,
+      name: "Our Family",
+      baby_name: "Aniya",
+      created_by: user.id,
+    });
+
+  if (familyError) {
+    return {
+      ok: false,
+      error: `Could not create family: ${familyError?.message ?? "unknown error"}`,
+    };
+  }
+
+  const { error: memberError } = await supabase.from("family_members").insert({
+    family_id: familyId,
+    user_id: user.id,
+    role: "owner",
+    joined_at: new Date().toISOString(),
+  });
+
+  if (memberError) {
+    return {
+      ok: false,
+      error: `Could not set up your membership: ${memberError.message}`,
     };
   }
 

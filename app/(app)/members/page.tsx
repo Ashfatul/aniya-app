@@ -12,13 +12,15 @@ export default async function MembersPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: family } = await supabase
-    .from("families")
-    .select("*")
-    .eq("created_by", user.id)
-    .limit(1)
-    .maybeSingle<Family>();
-  if (!family) redirect("/signup");
+  // Get family via membership
+  const { data: membership } = await supabase
+    .from("family_members")
+    .select("family:families(*)")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!membership || !membership.family) redirect("/signup");
+  const family = membership.family as unknown as Family;
 
   const { data: members } = await supabase
     .from("family_members")

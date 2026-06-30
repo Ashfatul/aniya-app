@@ -16,25 +16,22 @@ export default async function AddMomentPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: fam } = await supabase
-    .from("families")
-    .select("id")
-    .eq("created_by", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!fam) redirect("/signup");
-
-  // Get my role
-  const { data: fm } = await supabase
+  // Get my family membership and role
+  const { data: membership } = await supabase
     .from("family_members")
-    .select("role")
+    .select("role, family:families(id)")
     .eq("user_id", user.id)
-    .eq("family_id", fam.id)
     .maybeSingle();
 
-  if (!canEdit(fm?.role as any)) {
+  if (!membership || !membership.family) {
+    redirect("/signup");
+  }
+
+  if (!canEdit(membership.role as any)) {
     redirect("/timeline");
   }
+
+  const familyId = (membership.family as any).id;
 
   const params = await searchParams;
   const initialModule = (params.module as any) || "memory";
@@ -47,7 +44,7 @@ export default async function AddMomentPage({
           Choose what to capture — you can update anything later.
         </p>
       </div>
-      <AddMomentForm initialModule={initialModule} familyId={fam.id} />
+      <AddMomentForm initialModule={initialModule} familyId={familyId} />
     </div>
   );
 }

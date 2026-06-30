@@ -203,6 +203,12 @@ create policy "families insert self"
   on public.families for insert
   with check (auth.uid() = created_by);
 
+-- Allow the creator of a family to read it (required to bypass chicken-and-egg RLS lock during setup)
+drop policy if exists "families creator read" on public.families;
+create policy "families creator read"
+  on public.families for select
+  using (created_by = auth.uid());
+
 -- ----- family_members ----------------------------------------------------
 drop policy if exists "members read"      on public.family_members;
 drop policy if exists "members owner manage" on public.family_members;
@@ -218,6 +224,18 @@ create policy "members owner manage"
   on public.family_members for all
   using (public.my_family_role(family_id) = 'owner')
   with check (public.my_family_role(family_id) = 'owner');
+
+-- Allow the initial owner to insert their own membership for a family they created.
+create policy "members self insert"
+  on public.family_members for insert
+  with check (
+    user_id = auth.uid()
+    and role = 'owner'
+    and exists(
+      select 1 from public.families
+      where id = family_id and created_by = auth.uid()
+    )
+  );
 
 -- A user can join their own pending invite row (claimed via auth).
 create policy "members self update"

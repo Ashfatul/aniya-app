@@ -9,8 +9,6 @@ import type { ModuleType, GrowthData, FeedingData, SleepData, MilestoneData } fr
 
 export type EntryState = { ok: true; id: string } | { ok: false; error: string } | null;
 
-const initialEntryState: EntryState = null;
-
 export async function createEntryAction(
   _prev: EntryState,
   formData: FormData
@@ -21,13 +19,12 @@ export async function createEntryAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in." };
 
-  const { data: family } = await supabase
-    .from("families")
-    .select("id")
-    .eq("created_by", user.id)
-    .limit(1)
+  const { data: membership } = await supabase
+    .from("family_members")
+    .select("family_id")
+    .eq("user_id", user.id)
     .maybeSingle();
-  if (!family) return { ok: false, error: "Family not found." };
+  if (!membership) return { ok: false, error: "Family not found." };
 
   const module = formData.get("module") as ModuleType;
   const title = (formData.get("title") as string)?.trim();
@@ -47,7 +44,7 @@ export async function createEntryAction(
   const { data: created, error } = await supabase
     .from("timeline_entries")
     .insert({
-      family_id: family.id,
+      family_id: membership.family_id,
       module,
       title,
       caption,
@@ -171,5 +168,3 @@ function buildModuleData(
       return {};
   }
 }
-
-export { initialEntryState };

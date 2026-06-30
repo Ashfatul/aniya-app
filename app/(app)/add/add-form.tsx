@@ -19,7 +19,6 @@ import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import {
   createEntryAction,
-  initialEntryState,
   type EntryState,
 } from "./actions";
 import type { ModuleType } from "@/lib/types";
@@ -85,7 +84,7 @@ export function AddMomentForm({
 }) {
   const [state, formAction, pending] = useActionState(
     createEntryAction,
-    initialEntryState
+    null
   );
 
   const [module, setModule] = useState<ModuleType>(initialModule);

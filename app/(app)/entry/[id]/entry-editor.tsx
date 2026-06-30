@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import {
   updateEntryAction,
-  initialEntryState,
   type EntryState,
 } from "../../add/actions";
 import { deleteEntryAction } from "../../actions";
@@ -35,7 +34,7 @@ export function EntryEditor({ entry }: { entry: TimelineItem }) {
   const [state, formAction, pending] = useActionState(
     (prev: EntryState, fd: FormData) =>
       updateEntryAction(entry.id, prev, fd),
-    initialEntryState
+    null
   );
 
   // After success close editor
