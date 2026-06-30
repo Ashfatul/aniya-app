@@ -1,12 +1,17 @@
-import { createClient } from "./client";
+import "server-only";
+
+import { createClient } from "./server";
 import type { Family, FamilyMember, Profile, UserRole } from "@/lib/types";
 
 /**
  * Returns the authenticated user, family, and their role — or null if anonymous.
  * Single source of truth used by every authenticated page.
+ *
+ * MUST run on the server (RSC / server actions / route handlers).
+ * Use the browser client only from `"use client"` components.
  */
 export async function getSessionContext() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
@@ -11,13 +11,11 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense fallback={null}>
       <LoginForm />
     </Suspense>
   );
 }
-
-import { Suspense } from "react";
 
 function LoginForm() {
   const router = useRouter();
