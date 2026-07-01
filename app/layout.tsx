@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Caveat } from "next/font/google";
+import NextTopLoader from "nextjs-toploader";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import "./globals.css";
@@ -53,6 +54,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-soft-gradient">
+        <NextTopLoader color="#f4a5b8" showSpinner={false} />
         <ServiceWorkerRegister />
         <PWAInstallPrompt />
         {children}
