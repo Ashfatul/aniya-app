@@ -40,7 +40,7 @@ You need **two free accounts**:
 2. Click **New query**.
 3. Open the file `supabase/schema.sql` from this repo, copy everything, paste it in.
 4. Click **Run**. You should see "Success. No rows returned" — that's expected; it just means tables/policies were created.
-5. Go to **Storage** → confirm a bucket called `media` exists. If not, create one named exactly `media` with **Public = OFF**.
+5. Go to **Storage** → confirm a bucket called `media` exists. If not, create one named exactly `media` with **Public = ON**.
 
 ### Step 3 — Get your API keys
 
@@ -97,8 +97,9 @@ Now anyone you sign up just logs straight in.
 
 1. Sign in as the **owner**.
 2. Bottom nav → **Family**.
-3. Type the family member's email and pick **Viewer** (can see everything) or **Editor** (can add/edit memories too).
-4. They click your Vercel URL → **Sign up** with that same email. The app will automatically link them to your family.
+3. Type the family member's email, pick **Viewer** or **Editor**, and click **Create invite**.
+4. The app will generate a secure invite link. **Copy this link** and send it to them!
+5. When they open the link, they'll see a special Join page where they can set their password and instantly access your family's memory book.
 
 **What each role can do:**
 
@@ -114,10 +115,10 @@ Now anyone you sign up just logs straight in.
 
 The app works as a regular web page, but for a more native feel:
 
-- **iPhone/iPad**: open in Safari → Share → "Add to Home Screen".
-- **Android**: open in Chrome → menu → "Install app".
+- **iPhone/iPad**: After a few seconds, a custom prompt will slide up instructing you to tap the **Share** button and select **Add to Home Screen**.
+- **Android**: Chrome will automatically prompt you with an **Install App** button at the bottom of the screen.
 
-It then opens full-screen, like a regular app, and your auth session persists.
+It then opens full-screen, like a regular app, complete with a beautiful glassmorphism icon, and your auth session persists.
 
 ---
 
@@ -137,7 +138,7 @@ That's it — no schema migrations for new fields, just put them in `data` as JS
 
 **"Invalid API key"** — your `.env.local` is wrong or missing. Restart `npm run dev` after editing env files.
 
-**Photos won't upload** — make sure the `media` storage bucket exists and is **not public**. The RLS policies handle privacy.
+**Photos won't upload** — make sure the `media` storage bucket exists and is **set to Public**. The database handles privacy at the folder level.
 
 **"new row violates row-level security policy"** — your signed-in user doesn't have a `family_members` row yet. Try signing out and back in.
 
