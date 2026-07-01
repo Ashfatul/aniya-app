@@ -9,10 +9,13 @@
 //
 // We also accept `?code=...` for the older OAuth-style flow, just in case
 // the project is configured for it.
+//
+// If `?invite=<token>` is present (forwarded by the signup action when
+// the user is joining via an invite link), we claim the invite after
+// establishing the session.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import crypto from "crypto";
 
 type OtpType = "signup" | "magiclink" | "recovery" | "email_change" | "invite";
 
@@ -22,6 +25,7 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get("token_hash");
   const typeParam = searchParams.get("type") as OtpType | null;
   const next = searchParams.get("next") ?? "/timeline";
+  const inviteToken = searchParams.get("invite") ?? undefined;
   const errorDescription = searchParams.get("error_description");
 
   // Supabase sometimes forwards errors here.
@@ -64,43 +68,26 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
 
       if (!membership) {
-        // Check for pending invitation
-        const { data: invite } = await supabase
-          .from("family_members")
-          .select("id")
-          .eq("invited_email", user.email?.toLowerCase() ?? "")
-          .is("user_id", null)
-          .maybeSingle();
+        // Prefer the explicit invite token from the URL — that handles the
+        // case where the user clicked the link in the owner's email. Fall
+        // back to creating a new family if no invite was forwarded.
+        if (inviteToken) {
+          const { error: claimError } = await supabase.rpc(
+            "claim_invite_by_token",
+            {
+              p_token: inviteToken,
+              p_user_id: user.id,
+            }
+          );
 
-        if (invite) {
-          // Join the existing family
-          await supabase
-            .from("family_members")
-            .update({
-              user_id: user.id,
-              joined_at: new Date().toISOString(),
-            })
-            .eq("id", invite.id);
-        } else {
-          // Create a new family
-          const familyId = crypto.randomUUID();
-          const { error: familyError } = await supabase
-            .from("families")
-            .insert({
-              id: familyId,
-              name: "Our Family",
-              baby_name: "Aniya",
-              created_by: user.id,
-            });
-
-          if (!familyError) {
-            await supabase.from("family_members").insert({
-              family_id: familyId,
-              user_id: user.id,
-              role: "owner",
-              joined_at: new Date().toISOString(),
-            });
+          // If the claim fails (expired/already-used/etc), still try to set
+          // them up in their own family so they're not stuck. The signup
+          // page would have shown a similar error if the user got that far.
+          if (claimError) {
+            await ensureFamilyForUser(supabase, user.id);
           }
+        } else {
+          await ensureFamilyForUser(supabase, user.id);
         }
       }
     }
@@ -112,4 +99,37 @@ export async function GET(request: NextRequest) {
   // so we can see it in the address bar.
   const reason = encodeURIComponent(exchangeError.message || "verify");
   return NextResponse.redirect(new URL(`/login?error=${reason}`, origin));
+}
+
+async function ensureFamilyForUser(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+) {
+  // Idempotent — only create if the user still has no membership.
+  const { data: existing } = await supabase
+    .from("family_members")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (existing) return;
+
+  await supabase.from("families").insert({
+    name: "Our Family",
+    baby_name: "Aniya",
+    created_by: userId,
+  });
+  const { data: family } = await supabase
+    .from("families")
+    .select("id")
+    .eq("created_by", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!family) return;
+  await supabase.from("family_members").insert({
+    family_id: family.id,
+    user_id: userId,
+    role: "owner",
+    joined_at: new Date().toISOString(),
+  });
 }

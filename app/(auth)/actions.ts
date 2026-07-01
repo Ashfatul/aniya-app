@@ -35,6 +35,19 @@ async function getRequestOrigin(): Promise<string> {
   return "http://localhost:3000";
 }
 
+/**
+ * Build the emailRedirectTo URL. When an invite token is present we forward
+ * it as a separate query param so the auth callback can claim the invite
+ * after the user confirms their email.
+ */
+async function buildEmailRedirectTo(inviteToken?: string): Promise<string> {
+  const origin = await getRequestOrigin();
+  const next = "/timeline";
+  const params = new URLSearchParams({ next });
+  if (inviteToken) params.set("invite", inviteToken);
+  return `${origin}/auth/callback?${params.toString()}`;
+}
+
 export async function signupAction(
   _prev: SignupState,
   formData: FormData
@@ -44,6 +57,7 @@ export async function signupAction(
   const babyName = (formData.get("baby_name") as string)?.trim() || "Baby";
   const familyName =
     (formData.get("family_name") as string)?.trim() || "Our Family";
+  const inviteToken = ((formData.get("invite") as string) || "").trim() || undefined;
 
   if (!email || !password) {
     return { ok: false, error: "Email and password are required." };
@@ -53,12 +67,11 @@ export async function signupAction(
   }
 
   const supabase = await createClient();
-  const origin = await getRequestOrigin();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?next=/timeline`,
+      emailRedirectTo: await buildEmailRedirectTo(inviteToken),
     },
   });
   if (error) {
@@ -83,7 +96,8 @@ export async function signupAction(
   // If Supabase email confirmation is ON, no session is issued yet.
   // We can't create family/membership here because RLS would block them
   // (auth.uid() isn't set until the user clicks the confirmation email).
-  // The /auth/callback route will finish the setup on click-through.
+  // The /auth/callback route will finish the setup on click-through, and
+  // it picks up the invite token from the emailRedirectTo query string.
   if (!data.session) {
     return {
       ok: false,
@@ -94,66 +108,39 @@ export async function signupAction(
     };
   }
 
-  // Check for pending invitation first
-  const { data: invite } = await supabase
-    .from("family_members")
-    .select("id")
-    .eq("invited_email", email.toLowerCase())
-    .is("user_id", null)
-    .maybeSingle();
+  // No invite — sign this user up as the family owner.
+  if (!inviteToken) {
+    return await createFamilyForOwner(supabase, userId, familyName, babyName);
+  }
 
-  if (invite) {
-    const { error: claimError } = await supabase
-      .from("family_members")
-      .update({
-        user_id: userId,
-        joined_at: new Date().toISOString(),
-      })
-      .eq("id", invite.id);
-
-    if (claimError) {
-      return {
-        ok: false,
-        error: `Could not accept invitation: ${claimError.message}`,
-      };
-    }
-
+  // Claim the invite. If it fails (bad/expired/already-used), we fall
+  // through to creating a new family so the user isn't left in limbo.
+  const claim = await supabase.rpc("claim_invite_by_token", {
+    p_token: inviteToken,
+    p_user_id: userId,
+  });
+  if (!claim.error) {
     redirect("/timeline");
   }
 
-  const familyId = crypto.randomUUID();
-  // Create family + owner membership. RLS requires auth.uid() = created_by.
-  const { error: familyError } = await supabase
-    .from("families")
-    .insert({
-      id: familyId,
-      name: familyName,
-      baby_name: babyName,
-      created_by: userId,
-    });
-
-  if (familyError) {
+  // Token was unusable — explain what happened and then fall back to a new
+  // family so the user can still use the app.
+  if (
+    /already been used|expired|invalid|tampered|not found/i.test(
+      claim.error.message
+    )
+  ) {
     return {
       ok: false,
-      error: `Could not create family: ${familyError.message}`,
+      error: `This invite link can no longer be used (${claim.error.message}). You can still create your own family below.`,
     };
   }
-
-  const { error: memberError } = await supabase.from("family_members").insert({
-    family_id: familyId,
-    user_id: userId,
-    role: "owner",
-    joined_at: new Date().toISOString(),
-  });
-
-  if (memberError) {
-    return {
-      ok: false,
-      error: `Failed to set up your membership: ${memberError.message}`,
-    };
-  }
-
-  redirect("/timeline");
+  // Some other error — fall through to creating a family but surface the
+  // error so the user knows something went wrong.
+  return {
+    ok: false,
+    error: `Could not accept the invite: ${claim.error.message}`,
+  };
 }
 
 /**
@@ -162,10 +149,11 @@ export async function signupAction(
  * or they signed up with verification off and the family insert failed).
  *
  * Called from the /signup page when the user lands there but already has
- * a valid session. Creates the family + owner membership if missing, then
- * redirects to /timeline.
+ * a valid session. If an invite token is present (via hidden form field),
+ * claims it; otherwise creates a family + owner membership. Then redirects
+ * to /timeline.
  */
-export async function completeSetupAction(): Promise<SignupState> {
+export async function completeSetupAction(_prev: SignupState, formData: FormData): Promise<SignupState> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -174,6 +162,9 @@ export async function completeSetupAction(): Promise<SignupState> {
   if (!user) {
     return { ok: false, error: "Please sign in first." };
   }
+
+  const inviteToken =
+    ((formData.get("invite") as string) || "").trim() || undefined;
 
   const { data: existingMembership } = await supabase
     .from("family_members")
@@ -186,53 +177,62 @@ export async function completeSetupAction(): Promise<SignupState> {
     redirect("/timeline");
   }
 
-  // Check for pending invitation
-  const { data: invite } = await supabase
-    .from("family_members")
-    .select("id")
-    .eq("invited_email", user.email?.toLowerCase() ?? "")
-    .is("user_id", null)
-    .maybeSingle();
-
-  if (invite) {
-    const { error: claimError } = await supabase
-      .from("family_members")
-      .update({
-        user_id: user.id,
-        joined_at: new Date().toISOString(),
-      })
-      .eq("id", invite.id);
-
-    if (claimError) {
+  if (inviteToken) {
+    const claim = await supabase.rpc("claim_invite_by_token", {
+      p_token: inviteToken,
+      p_user_id: user.id,
+    });
+    if (!claim.error) {
+      redirect("/timeline");
+    }
+    if (
+      /already been used|expired|invalid|tampered|not found/i.test(
+        claim.error.message
+      )
+    ) {
       return {
         ok: false,
-        error: `Could not accept invitation: ${claimError.message}`,
+        error: `This invite link can no longer be used (${claim.error.message}). You can still create your own family below.`,
       };
     }
-
-    redirect("/timeline");
+    return {
+      ok: false,
+      error: `Could not accept the invite: ${claim.error.message}`,
+    };
   }
 
+  return await createFamilyForOwner(supabase, user.id, "Our Family", "Aniya");
+}
+
+/**
+ * Creates a fresh family and owner membership for a user who has no
+ * pending invite. Returns a state on failure (which the form will surface);
+ * on success, redirects to /timeline and never returns.
+ */
+async function createFamilyForOwner(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  familyName: string,
+  babyName: string
+): Promise<SignupState> {
   const familyId = crypto.randomUUID();
-  const { error: familyError } = await supabase
-    .from("families")
-    .insert({
-      id: familyId,
-      name: "Our Family",
-      baby_name: "Aniya",
-      created_by: user.id,
-    });
+  const { error: familyError } = await supabase.from("families").insert({
+    id: familyId,
+    name: familyName,
+    baby_name: babyName,
+    created_by: userId,
+  });
 
   if (familyError) {
     return {
       ok: false,
-      error: `Could not create family: ${familyError?.message ?? "unknown error"}`,
+      error: `Could not create family: ${familyError.message}`,
     };
   }
 
   const { error: memberError } = await supabase.from("family_members").insert({
     family_id: familyId,
-    user_id: user.id,
+    user_id: userId,
     role: "owner",
     joined_at: new Date().toISOString(),
   });

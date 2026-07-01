@@ -6,6 +6,7 @@
 
 -- 0. Extensions
 create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto";
 
 -- ============================================================================
 -- 1. TABLES
@@ -337,3 +338,231 @@ $$;
 
 -- Grant execute to authenticated users
 grant execute on function public.accept_invite(text) to authenticated;
+
+-- ============================================================================
+-- 7. INVITE TOKENS — secure, single-use share links for inviting members.
+-- ============================================================================
+-- The owner generates a token in the app, the app inserts a row with a
+-- signed token string ("<uuid>.<hmac>"), and copies the link. The recipient
+-- opens the link, signs up, and the server claims the token via
+-- `claim_invite_by_token`, which atomically creates their family_members
+-- row in the inviter's family.
+--
+-- We use a token table (rather than reusing `family_members.id`) for two
+-- reasons:
+--   1. RLS on `family_members` does not let an anonymous user read pending
+--      invite rows, so the signup page can't show "Join your family" without
+--      a SECURITY DEFINER RPC. A dedicated table with its own access surface
+--      is easier to reason about.
+--   2. The token can be rotated, expired, and consumed independently of the
+--      membership row, which is what we want for share-link semantics.
+-- ============================================================================
+
+create table if not exists public.invite_tokens (
+  token text primary key,             -- "<uuid>.<hmac-sha256-hex>"
+  family_id uuid not null references public.families(id) on delete cascade,
+  invited_email text not null,
+  role text not null default 'viewer'
+    check (role in ('editor', 'viewer')),
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
+  consumed_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists invite_tokens_family_idx
+  on public.invite_tokens (family_id);
+create index if not exists invite_tokens_email_open_idx
+  on public.invite_tokens (invited_email)
+  where consumed_at is null;
+
+alter table public.invite_tokens enable row level security;
+
+-- Owners can create tokens for their own family. No direct reads for anon or
+-- auth — the lookup / claim go through SECURITY DEFINER RPCs.
+drop policy if exists "invite_tokens owner write" on public.invite_tokens;
+create policy "invite_tokens owner write"
+  on public.invite_tokens for insert
+  with check (public.my_family_role(family_id) = 'owner');
+
+drop policy if exists "invite_tokens owner delete" on public.invite_tokens;
+create policy "invite_tokens owner delete"
+  on public.invite_tokens for delete
+  using (public.my_family_role(family_id) = 'owner');
+
+-- Single-row secret store. Rotated by UPDATE in the SQL editor. We do not
+-- grant SELECT to anyone — only the SECURITY DEFINER functions below read it.
+create table if not exists public.invite_secrets (
+  id int primary key default 1 check (id = 1),
+  secret text not null
+);
+insert into public.invite_secrets (id, secret)
+values (1, encode(gen_random_bytes(32), 'hex'))
+on conflict (id) do nothing;
+
+-- ===== helpers: sign / verify / lookup / claim =====
+
+create or replace function public.sign_invite_token(p_payload text)
+returns text
+language sql
+stable
+as $$
+  select p_payload || '.' || encode(
+    hmac(p_payload, (select secret from public.invite_secrets where id = 1), 'sha256'),
+    'hex'
+  );
+$$;
+
+create or replace function public.verify_invite_token(p_token text)
+returns text
+language plpgsql
+stable
+as $$
+declare
+  v_dot int;
+  v_payload text;
+  v_expected text;
+  v_got text;
+begin
+  v_dot := strpos(p_token, '.');
+  if v_dot = 0 then return null; end if;
+  v_payload := substring(p_token from 1 for v_dot - 1);
+  v_expected := substring(p_token from v_dot + 1);
+  v_got := encode(
+    hmac(v_payload, (select secret from public.invite_secrets where id = 1), 'sha256'),
+    'hex'
+  );
+  if v_expected = v_got then
+    return v_payload;
+  end if;
+  return null;
+end;
+$$;
+
+-- Anonymous-safe lookup. Returns one row if the token is well-formed, signed
+-- correctly, not expired, and not yet consumed; otherwise no rows.
+create or replace function public.lookup_invite_by_token(p_token text)
+returns table (
+  family_id uuid,
+  family_name text,
+  baby_name text,
+  invited_email text,
+  role text,
+  expires_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.verify_invite_token(p_token) is null then
+    return;
+  end if;
+
+  return query
+    select t.family_id, f.name, f.baby_name, t.invited_email, t.role, t.expires_at
+    from public.invite_tokens t
+    join public.families f on f.id = t.family_id
+    where t.token = p_token
+      and t.consumed_at is null
+      and t.expires_at > now();
+end;
+$$;
+
+-- Atomic claim. Idempotent for the same (token, user): if the same user
+-- already consumed it, returns the family_id without re-inserting. If a
+-- different user already consumed it, raises.
+create or replace function public.claim_invite_by_token(
+  p_token text,
+  p_user_id uuid
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_record record;
+begin
+  if public.verify_invite_token(p_token) is null then
+    raise exception 'Invalid or tampered invite link';
+  end if;
+
+  select t.family_id, t.invited_email, t.role, t.consumed_by
+    into v_record
+    from public.invite_tokens t
+    where t.token = p_token
+    for update;
+
+  if not found then
+    raise exception 'Invite not found';
+  end if;
+  if v_record.expires_at <= now() then
+    raise exception 'This invite link has expired';
+  end if;
+  if v_record.consumed_by is not null and v_record.consumed_by <> p_user_id then
+    raise exception 'This invite has already been used';
+  end if;
+  if v_record.consumed_by = p_user_id then
+    -- Already claimed by this user. Make sure their family_members row exists.
+    insert into public.family_members (family_id, user_id, role, joined_at)
+      values (v_record.family_id, p_user_id, v_record.role, now())
+      on conflict (family_id, user_id) do nothing;
+    return v_record.family_id;
+  end if;
+
+  update public.invite_tokens
+    set consumed_at = now(),
+        consumed_by = p_user_id
+    where token = p_token;
+
+  insert into public.family_members (family_id, user_id, role, joined_at)
+    values (v_record.family_id, p_user_id, v_record.role, now())
+    on conflict (family_id, user_id) do update
+      set role = excluded.role,
+          joined_at = now();
+
+  return v_record.family_id;
+end;
+$$;
+
+grant execute on function public.lookup_invite_by_token(text) to anon, authenticated;
+grant execute on function public.claim_invite_by_token(text, uuid) to authenticated;
+
+-- Build the canonical signed token for a fresh invite. The app passes the
+-- payload (typically the invite row's own uuid) and uses the returned string
+-- as the primary key. Doing it in SQL keeps the secret on the server.
+create or replace function public.create_invite_token(
+  p_family_id uuid,
+  p_invited_email text,
+  p_role text,
+  p_ttl interval default interval '7 days'
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_payload text;
+  v_token text;
+  v_expires timestamptz;
+begin
+  if public.my_family_role(p_family_id) is distinct from 'owner' then
+    raise exception 'Only the family owner can create invite tokens';
+  end if;
+  if p_role not in ('editor', 'viewer') then
+    raise exception 'Invalid role %', p_role;
+  end if;
+
+  v_payload := gen_random_uuid()::text;
+  v_token := public.sign_invite_token(v_payload);
+  v_expires := now() + p_ttl;
+
+  insert into public.invite_tokens (token, family_id, invited_email, role, expires_at)
+  values (v_token, p_family_id, lower(p_invited_email), p_role, v_expires);
+
+  return v_token;
+end;
+$$;
+
+grant execute on function public.create_invite_token(uuid, text, text, interval) to authenticated;

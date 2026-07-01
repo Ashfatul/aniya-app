@@ -10,7 +10,20 @@ import { signupAction, type SignupState } from "../actions";
 
 const initialState: SignupState = null;
 
-export function SignupForm() {
+type InviteInfo = {
+  token: string;
+  familyName: string;
+  babyName: string;
+  invitedEmail: string;
+};
+
+export function SignupForm({
+  invite,
+  inviteInvalid,
+}: {
+  invite: InviteInfo | null;
+  inviteInvalid: boolean;
+}) {
   const [state, formAction, pending] = useActionState(
     signupAction,
     initialState
@@ -25,13 +38,29 @@ export function SignupForm() {
   return (
     <Card className="w-full max-w-md p-8 fade-up">
       <h2 className="font-script text-3xl text-center text-[var(--foreground)] mb-1">
-        Start your story
+        {invite ? "Join your family" : "Start your story"}
       </h2>
       <p className="text-center text-sm text-[var(--foreground)]/60 mb-6">
-        A private memory book, just for your family
+        {invite
+          ? `You've been invited to join ${invite.familyName} as ${
+              invite.babyName || "their little one"
+            }'s family.`
+          : "A private memory book, just for your family"}
       </p>
 
+      {inviteInvalid && (
+        <div className="mb-4 flex items-start gap-2 p-3 rounded-xl text-sm bg-amber-50 text-amber-800">
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span>
+            This invite link is invalid or has expired. You can still create
+            your own family below.
+          </span>
+        </div>
+      )}
+
       <form action={formAction} className="space-y-4">
+        {invite && <input type="hidden" name="invite" value={invite.token} />}
+
         <div>
           <Label htmlFor="email">Email</Label>
           <div className="relative">
@@ -42,8 +71,10 @@ export function SignupForm() {
               type="email"
               required
               autoComplete="email"
+              defaultValue={invite?.invitedEmail || ""}
+              readOnly={!!invite}
               placeholder="you@example.com"
-              className="pl-11"
+              className={`pl-11 ${invite ? "bg-[var(--muted)] opacity-80 pointer-events-none" : ""}`}
             />
           </div>
         </div>
@@ -65,33 +96,35 @@ export function SignupForm() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label htmlFor="family_name">Family name</Label>
-            <div className="relative">
-              <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/40" />
-              <Input
-                id="family_name"
-                name="family_name"
-                defaultValue="Our Family"
-                className="pl-11"
-              />
+        {!invite && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="family_name">Family name</Label>
+              <div className="relative">
+                <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/40" />
+                <Input
+                  id="family_name"
+                  name="family_name"
+                  defaultValue="Our Family"
+                  className="pl-11"
+                />
+              </div>
             </div>
-          </div>
 
-          <div>
-            <Label htmlFor="baby_name">Baby&apos;s name</Label>
-            <div className="relative">
-              <Baby className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/40" />
-              <Input
-                id="baby_name"
-                name="baby_name"
-                defaultValue="Aniya"
-                className="pl-11"
-              />
+            <div>
+              <Label htmlFor="baby_name">Baby&apos;s name</Label>
+              <div className="relative">
+                <Baby className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/40" />
+                <Input
+                  id="baby_name"
+                  name="baby_name"
+                  defaultValue="Aniya"
+                  className="pl-11"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {error && (
           <div
@@ -107,7 +140,13 @@ export function SignupForm() {
         )}
 
         <Button type="submit" disabled={pending} className="w-full" size="lg">
-          {pending ? "Creating your memory book…" : "Create my memory book"}
+          {pending
+            ? invite
+              ? "Accepting invitation..."
+              : "Creating your memory book…"
+            : invite
+            ? "Accept invite & sign up"
+            : "Create my memory book"}
         </Button>
       </form>
 

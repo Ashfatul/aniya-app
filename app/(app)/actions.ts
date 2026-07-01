@@ -6,7 +6,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export type ActionState = { ok: true } | { ok: false; error: string } | null;
+export type ActionState =
+  | { ok: true; token?: string }
+  | { ok: false; error: string }
+  | null;
 
 // ----- Family / profile updates -----------------------------------------
 
@@ -118,11 +121,25 @@ export async function inviteMemberAction(
     .maybeSingle();
   if (!membership) return { ok: false, error: "Not authorized to invite members." };
 
-  const { error } = await supabase.from("family_members").insert({
-    family_id: membership.family_id,
-    user_id: null,
-    role,
-    invited_email: email,
+  // Block inviting the owner themselves, and block inviting an email that
+  // is already a member of this family.
+  const { data: existingMember } = await supabase
+    .from("family_members")
+    .select("id")
+    .eq("family_id", membership.family_id)
+    .or(`user_id.eq.${user.id},invited_email.eq.${email}`)
+    .limit(1)
+    .maybeSingle();
+  if (existingMember) {
+    return { ok: false, error: "That email is already part of this family." };
+  }
+
+  // create_invite_token handles the auth check (owner only) and returns the
+  // signed token string to put in the share link.
+  const { data: token, error } = await supabase.rpc("create_invite_token", {
+    p_family_id: membership.family_id,
+    p_invited_email: email,
+    p_role: role,
   });
 
   if (error) {
@@ -131,9 +148,12 @@ export async function inviteMemberAction(
     }
     return { ok: false, error: error.message };
   }
+  if (!token) {
+    return { ok: false, error: "Could not create invite link." };
+  }
 
   revalidatePath("/members");
-  return { ok: true };
+  return { ok: true, token: token as string };
 }
 
 export async function updateMemberRoleAction(
@@ -145,8 +165,33 @@ export async function updateMemberRoleAction(
   revalidatePath("/members");
 }
 
-export async function removeMemberAction(memberId: string): Promise<void> {
+export async function removeMemberAction(
+  memberId: string,
+  opts: { pendingEmail?: string } = {}
+): Promise<void> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // Look up the family so we can scope the token cleanup correctly.
+  const { data: membership } = await supabase
+    .from("family_members")
+    .select("family_id")
+    .eq("user_id", user.id)
+    .eq("role", "owner")
+    .maybeSingle();
+  if (!membership) return;
+
   await supabase.from("family_members").delete().eq("id", memberId);
+
+  // If this was a pending invite, also clear any matching open tokens.
+  if (opts.pendingEmail) {
+    await supabase
+      .from("invite_tokens")
+      .delete()
+      .eq("family_id", membership.family_id)
+      .eq("invited_email", opts.pendingEmail)
+      .is("consumed_at", null);
+  }
   revalidatePath("/members");
 }

@@ -1,7 +1,15 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { Mail, UserPlus, Loader2, Crown, Trash2, ShieldCheck } from "lucide-react";
+import { useActionState, useEffect, useState } from "react";
+import {
+  Mail,
+  UserPlus,
+  Loader2,
+  Crown,
+  Trash2,
+  Copy,
+  Check,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -24,11 +32,13 @@ const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
 export function MembersView({
   family,
   members,
+  tokenByEmail,
   currentUserId,
   myRole,
 }: {
   family: Family;
   members: (FamilyMember & { profile: any })[];
+  tokenByEmail: Record<string, string>;
   currentUserId: string;
   myRole: UserRole;
 }) {
@@ -38,8 +48,30 @@ export function MembersView({
     initialState
   );
   const [busy, setBusy] = useState<string | null>(null);
+  const [newInviteLink, setNewInviteLink] = useState<{
+    email: string;
+    link: string;
+  } | null>(null);
+  const [copiedNew, setCopiedNew] = useState(false);
 
   const ok = state && "ok" in state && state.ok;
+
+  // When an invite is created, capture the share link so the owner can copy
+  // it without hunting through the member list. We pick the email off the
+  // form so we know which token just got created.
+  useEffect(() => {
+    if (ok && state.token) {
+      const form = document.querySelector<HTMLFormElement>('form[data-invite-form]');
+      const email = form
+        ? ((form.elements.namedItem("email") as HTMLInputElement)?.value ?? "")
+        : "";
+      setNewInviteLink({
+        email,
+        link: `${window.location.origin}/signup?invite=${state.token}`,
+      });
+      setCopiedNew(false);
+    }
+  }, [state]);
 
   return (
     <div className="space-y-6">
@@ -59,6 +91,7 @@ export function MembersView({
             member={m}
             isOwner={isOwner}
             isMe={m.user_id === currentUserId}
+            token={m.user_id ? null : tokenByEmail[m.invited_email ?? ""] ?? null}
             busy={busy === m.id}
             setBusy={(b) => setBusy(b ? m.id : null)}
           />
@@ -76,7 +109,7 @@ export function MembersView({
             They&apos;ll be added when they sign up with the same email.
           </p>
 
-          <form action={formAction} className="space-y-3">
+          <form action={formAction} className="space-y-3" data-invite-form>
             <div>
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -102,10 +135,32 @@ export function MembersView({
               </Select>
             </div>
 
-            {ok && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-xl px-3 py-2">
-                Invitation added! They&apos;ll appear once they sign up.
-              </p>
+            {ok && newInviteLink && (
+              <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-3 space-y-2">
+                <p className="text-sm text-green-800 font-medium">
+                  Invitation ready for {newInviteLink.email || "them"}!
+                </p>
+                <p className="text-xs text-green-700/80 break-all font-mono">
+                  {newInviteLink.link}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(newInviteLink.link);
+                    setCopiedNew(true);
+                    setTimeout(() => setCopiedNew(false), 2000);
+                  }}
+                >
+                  {copiedNew ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                  {copiedNew ? "Copied!" : "Copy invite link"}
+                </Button>
+              </div>
             )}
             {state && !state.ok && (
               <p className="text-sm text-red-700 bg-red-50 rounded-xl px-3 py-2">
@@ -147,24 +202,25 @@ function MemberRow({
   member,
   isOwner,
   isMe,
+  token,
   busy,
   setBusy,
 }: {
   member: FamilyMember & { profile: any };
   isOwner: boolean;
   isMe: boolean;
+  token: string | null;
   busy: boolean;
   setBusy: (b: boolean) => void;
 }) {
   const joined = !!member.user_id;
+  const [copied, setCopied] = useState(false);
   const label = joined
     ? member.profile?.display_name ||
       member.profile?.email?.split("@")[0] ||
       member.invited_email
     : member.invited_email;
-  const sublabel = joined
-    ? member.profile?.email
-    : "Invitation pending";
+  const sublabel = joined ? member.profile?.email : "Invitation pending";
 
   async function onRoleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     setBusy(true);
@@ -175,8 +231,18 @@ function MemberRow({
   async function onRemove() {
     if (!confirm("Remove this member?")) return;
     setBusy(true);
-    await removeMemberAction(member.id);
+    await removeMemberAction(member.id, {
+      pendingEmail: joined ? undefined : (member.invited_email ?? undefined),
+    });
     setBusy(false);
+  }
+
+  function onCopyLink() {
+    if (!token) return;
+    const link = `${window.location.origin}/signup?invite=${token}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -224,13 +290,23 @@ function MemberRow({
           </button>
         </div>
       ) : isOwner && !joined ? (
-        <button
-          onClick={onRemove}
-          disabled={busy}
-          className="text-xs text-red-600 hover:underline px-2"
-        >
-          Cancel
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onCopyLink}
+            disabled={!token}
+            title={token ? "Copy invite link" : "No active invite link"}
+            className="text-xs text-[var(--primary-dark)] hover:underline px-2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {copied ? "Copied!" : "Copy Link"}
+          </button>
+          <button
+            onClick={onRemove}
+            disabled={busy}
+            className="text-xs text-red-600 hover:underline px-2"
+          >
+            Cancel
+          </button>
+        </div>
       ) : null}
     </div>
   );
