@@ -139,7 +139,7 @@ returns text
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   select role from public.family_members
   where family_id = p_family_id and user_id = auth.uid()
@@ -151,7 +151,7 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   select exists(
     select 1 from public.family_members
@@ -306,56 +306,7 @@ create policy "media owner delete"
   );
 
 -- ============================================================================
--- 6. RPC: helper for accepting an invite
--- ============================================================================
-create or replace function public.accept_invite(p_token text)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_member_id uuid;
-  v_family_id uuid;
-begin
-  select id, family_id into v_member_id, v_family_id
-  from public.family_members
-  where invited_email = (select email from auth.users where id = auth.uid())
-    and user_id is null
-  limit 1;
-
-  if v_member_id is null then
-    raise exception 'No pending invite for this user';
-  end if;
-
-  update public.family_members
-  set user_id = auth.uid(), joined_at = now()
-  where id = v_member_id;
-
-  return v_family_id;
-end;
-$$;
-
--- Grant execute to authenticated users
-grant execute on function public.accept_invite(text) to authenticated;
-
--- ============================================================================
--- 7. INVITE TOKENS — secure, single-use share links for inviting members.
--- ============================================================================
--- The owner generates a token in the app, the app inserts a row with a
--- signed token string ("<uuid>.<hmac>"), and copies the link. The recipient
--- opens the link, signs up, and the server claims the token via
--- `claim_invite_by_token`, which atomically creates their family_members
--- row in the inviter's family.
---
--- We use a token table (rather than reusing `family_members.id`) for two
--- reasons:
---   1. RLS on `family_members` does not let an anonymous user read pending
---      invite rows, so the signup page can't show "Join your family" without
---      a SECURITY DEFINER RPC. A dedicated table with its own access surface
---      is easier to reason about.
---   2. The token can be rotated, expired, and consumed independently of the
---      membership row, which is what we want for share-link semantics.
+-- 6. INVITE TOKENS — secure, single-use share links for inviting members.
 -- ============================================================================
 
 create table if not exists public.invite_tokens (
@@ -404,10 +355,10 @@ on conflict (id) do nothing;
 create or replace function public.sign_invite_token(p_payload text)
 returns text
 language sql
-stable
+set search_path = public, extensions, extensions
 as $$
   select p_payload || '.' || encode(
-    hmac(p_payload, (select secret from public.invite_secrets where id = 1), 'sha256'),
+    digest(convert_to(p_payload || (select secret from public.invite_secrets where id = 1), 'utf8'), 'sha256'::text),
     'hex'
   );
 $$;
@@ -416,6 +367,7 @@ create or replace function public.verify_invite_token(p_token text)
 returns text
 language plpgsql
 stable
+set search_path = public, extensions, extensions
 as $$
 declare
   v_dot int;
@@ -428,7 +380,7 @@ begin
   v_payload := substring(p_token from 1 for v_dot - 1);
   v_expected := substring(p_token from v_dot + 1);
   v_got := encode(
-    hmac(v_payload, (select secret from public.invite_secrets where id = 1), 'sha256'),
+    digest(convert_to(v_payload || (select secret from public.invite_secrets where id = 1), 'utf8'), 'sha256'::text),
     'hex'
   );
   if v_expected = v_got then
@@ -451,7 +403,7 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   if public.verify_invite_token(p_token) is null then
@@ -478,7 +430,7 @@ create or replace function public.claim_invite_by_token(
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_record record;
@@ -487,7 +439,7 @@ begin
     raise exception 'Invalid or tampered invite link';
   end if;
 
-  select t.family_id, t.invited_email, t.role, t.consumed_by
+  select t.family_id, t.invited_email, t.role, t.consumed_by, t.expires_at
     into v_record
     from public.invite_tokens t
     where t.token = p_token
@@ -504,9 +456,9 @@ begin
   end if;
   if v_record.consumed_by = p_user_id then
     -- Already claimed by this user. Make sure their family_members row exists.
-    insert into public.family_members (family_id, user_id, role, joined_at)
-      values (v_record.family_id, p_user_id, v_record.role, now())
-      on conflict (family_id, user_id) do nothing;
+    insert into public.family_members (family_id, user_id, role, joined_at, invited_email)
+      values (v_record.family_id, p_user_id, v_record.role, now(), v_record.invited_email)
+      on conflict (family_id, user_id) where user_id is not null do nothing;
     return v_record.family_id;
   end if;
 
@@ -515,11 +467,12 @@ begin
         consumed_by = p_user_id
     where token = p_token;
 
-  insert into public.family_members (family_id, user_id, role, joined_at)
-    values (v_record.family_id, p_user_id, v_record.role, now())
-    on conflict (family_id, user_id) do update
+  insert into public.family_members (family_id, user_id, role, joined_at, invited_email)
+    values (v_record.family_id, p_user_id, v_record.role, now(), v_record.invited_email)
+    on conflict (family_id, user_id) where user_id is not null do update
       set role = excluded.role,
-          joined_at = now();
+          joined_at = now(),
+          invited_email = excluded.invited_email;
 
   return v_record.family_id;
 end;
@@ -540,7 +493,7 @@ create or replace function public.create_invite_token(
 returns text
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_payload text;
