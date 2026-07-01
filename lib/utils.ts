@@ -87,7 +87,15 @@ export function groupByDate<T extends { occurred_at: string }>(
 ): { date: string; label: string; items: T[] }[] {
   const map = new Map<string, T[]>();
   for (const it of items) {
-    const key = new Date(it.occurred_at).toISOString().slice(0, 10);
+    let key = "1970-01-01";
+    try {
+      const d = new Date(it.occurred_at);
+      if (!isNaN(d.getTime())) {
+        key = d.toISOString().slice(0, 10);
+      }
+    } catch (e) {
+      // fallback to epoch if invalid
+    }
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(it);
   }

@@ -129,10 +129,18 @@ export default async function TimelinePage() {
 }
 
 function TimelineCard({ item }: { item: TimelineItem }) {
-  const time = new Date(item.occurred_at).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  let time = "";
+  try {
+    const d = new Date(item.occurred_at);
+    if (!isNaN(d.getTime())) {
+      time = d.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+  } catch (e) {
+    // leave time blank if invalid
+  }
 
   return (
     <Link
