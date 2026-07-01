@@ -48,24 +48,35 @@ export default async function MembersPage() {
   // (not-yet-joined) family_members row has at most one matching token.
   const { data: tokens } = await supabase
     .from("invite_tokens")
-    .select("token, invited_email")
+    .select("token, invited_email, role")
     .eq("family_id", family.id)
     .is("consumed_at", null)
-    .returns<{ token: string; invited_email: string }[]>();
+    .returns<{ token: string; invited_email: string; role: string }[]>();
 
   const tokenByEmail = new Map<string, string>();
+  const pendingMembers: any[] = [];
   for (const t of tokens ?? []) {
     tokenByEmail.set(t.invited_email, t.token);
+    pendingMembers.push({
+      id: t.token,
+      family_id: family.id,
+      user_id: null,
+      role: t.role,
+      invited_email: t.invited_email,
+      profile: null,
+    });
   }
 
+  const allMembers = [...members, ...pendingMembers];
+
   // Find my role in this family
-  const me = (members ?? []).find((m) => m.user_id === user.id);
+  const me = members.find((m) => m.user_id === user.id);
   const myRole = me?.role as UserRole | undefined;
 
   return (
     <MembersView
       family={family}
-      members={members ?? []}
+      members={allMembers}
       tokenByEmail={Object.fromEntries(tokenByEmail)}
       currentUserId={user.id}
       myRole={myRole ?? "viewer"}

@@ -121,17 +121,23 @@ export async function inviteMemberAction(
     .maybeSingle();
   if (!membership) return { ok: false, error: "Not authorized to invite members." };
 
-  // Block inviting the owner themselves, and block inviting an email that
-  // is already a member of this family.
-  const { data: existingMember } = await supabase
-    .from("family_members")
-    .select("id")
+  if (email === user.email) {
+    return { ok: false, error: "You cannot invite yourself." };
+  }
+
+  // Block inviting an email that is already a member of this family.
+  // Wait, we need to check if they are already in the family, or if there is an open invite.
+  const { data: openInvite } = await supabase
+    .from("invite_tokens")
+    .select("token")
     .eq("family_id", membership.family_id)
-    .or(`user_id.eq.${user.id},invited_email.eq.${email}`)
+    .eq("invited_email", email)
+    .is("consumed_at", null)
     .limit(1)
     .maybeSingle();
-  if (existingMember) {
-    return { ok: false, error: "That email is already part of this family." };
+
+  if (openInvite) {
+    return { ok: false, error: "That email has already been invited." };
   }
 
   // create_invite_token handles the auth check (owner only) and returns the

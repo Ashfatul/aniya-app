@@ -121,8 +121,8 @@ create trigger on_auth_user_created
 -- ============================================================================
 -- Create the bucket from SQL (Supabase also lets you do this via the UI).
 insert into storage.buckets (id, name, public)
-values ('media', 'media', false)
-on conflict (id) do nothing;
+values ('media', 'media', true)
+on conflict (id) do update set public = true;
 
 -- ============================================================================
 -- 4. ROW-LEVEL SECURITY

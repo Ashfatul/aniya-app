@@ -158,6 +158,13 @@ export function SignupForm({
         >
           Sign in
         </Link>
+        <span className="mx-2">•</span>
+        <Link
+          href="/join"
+          className="text-[var(--primary-dark)] font-medium hover:underline"
+        >
+          Have an invite?
+        </Link>
       </div>
     </Card>
   );
