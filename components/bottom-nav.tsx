@@ -15,8 +15,8 @@ const items = [
 export function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur border-t border-[var(--border)] z-30">
-      <div className="max-w-3xl mx-auto grid grid-cols-4">
+    <nav className="fixed bottom-0 inset-x-0 bg-white/85 backdrop-blur-md border-t border-[var(--border)] z-30 md:hidden">
+      <div className="max-w-md mx-auto grid grid-cols-4">
         {items.map((it) => {
           const active =
             pathname === it.href || pathname.startsWith(it.href + "/");

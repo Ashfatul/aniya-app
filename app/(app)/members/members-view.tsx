@@ -76,124 +76,132 @@ export function MembersView({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-script text-3xl">Family</h1>
-        <p className="text-sm text-[var(--foreground)]/60 mt-1">
+        <h1 className="font-script text-4xl font-bold text-[var(--foreground)]">Family</h1>
+        <p className="text-sm text-[var(--foreground)]/65 mt-1">
           {family.name} · {members.length} member
           {members.length === 1 ? "" : "s"}
         </p>
       </div>
 
-      {/* Members list */}
-      <section className="space-y-2">
-        {members.map((m) => (
-          <MemberRow
-            key={m.id}
-            member={m}
-            isOwner={isOwner}
-            isMe={m.user_id === currentUserId}
-            token={m.user_id ? null : tokenByEmail[m.invited_email ?? ""] ?? null}
-            busy={busy === m.id}
-            setBusy={(b) => setBusy(b ? m.id : null)}
-          />
-        ))}
-      </section>
-
-      {/* Invite form (owner only) */}
-      {isOwner && (
-        <Card className="p-5">
-          <h2 className="font-medium mb-1 flex items-center gap-2">
-            <UserPlus className="w-4 h-4" />
-            Invite someone
-          </h2>
-          <p className="text-xs text-[var(--foreground)]/60 mb-4">
-            They&apos;ll be added when they sign up with the same email.
-          </p>
-
-          <form action={formAction} className="space-y-3" data-invite-form>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/40" />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  placeholder="grandma@example.com"
-                  className="pl-11"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="role">Role</Label>
-              <Select id="role" name="role" defaultValue="viewer">
-                <option value="viewer">Viewer — can see everything</option>
-                <option value="editor">
-                  Editor — can add memories & content
-                </option>
-              </Select>
-            </div>
-
-            {ok && newInviteLink && (
-              <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-3 space-y-2">
-                <p className="text-sm text-green-800 font-medium">
-                  Invitation ready for {newInviteLink.email || "them"}!
-                </p>
-                <p className="text-xs text-green-700/80 break-all font-mono">
-                  {newInviteLink.link}
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    navigator.clipboard.writeText(newInviteLink.link);
-                    setCopiedNew(true);
-                    setTimeout(() => setCopiedNew(false), 2000);
-                  }}
-                >
-                  {copiedNew ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                  {copiedNew ? "Copied!" : "Copy invite link"}
-                </Button>
-              </div>
-            )}
-            {state && !state.ok && (
-              <p className="text-sm text-red-700 bg-red-50 rounded-xl px-3 py-2">
-                {state.error}
-              </p>
-            )}
-
-            <Button type="submit" disabled={pending}>
-              {pending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <UserPlus className="w-4 h-4" />
-              )}
-              Send invite
-            </Button>
-          </form>
-        </Card>
-      )}
-
-      {/* Role legend */}
-      <Card className="p-5 bg-[var(--muted)] border-0">
-        <h3 className="font-medium mb-2 text-sm">Roles explained</h3>
-        <div className="space-y-2 text-sm text-[var(--foreground)]/70">
-          {(["owner", "editor", "viewer"] as UserRole[]).map((r) => (
-            <div key={r} className="flex items-start gap-2">
-              <span className="font-medium capitalize text-[var(--foreground)] mt-0.5">
-                {r}:
-              </span>
-              <span>{ROLE_DESCRIPTIONS[r]}</span>
-            </div>
-          ))}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left / Main column: Members list */}
+        <div className="lg:col-span-7 space-y-4">
+          <h2 className="font-semibold text-sm text-[var(--foreground)]/80">Family Members</h2>
+          <section className="space-y-2.5">
+            {members.map((m) => (
+              <MemberRow
+                key={m.id}
+                member={m}
+                isOwner={isOwner}
+                isMe={m.user_id === currentUserId}
+                token={m.user_id ? null : tokenByEmail[m.invited_email ?? ""] ?? null}
+                busy={busy === m.id}
+                setBusy={(b) => setBusy(b ? m.id : null)}
+              />
+            ))}
+          </section>
         </div>
-      </Card>
+
+        {/* Right column: Invite & Role Guide */}
+        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
+          {/* Invite form (owner only) */}
+          {isOwner && (
+            <Card className="p-6 bg-white rounded-3xl border border-[var(--border)] shadow-sm">
+              <h2 className="font-semibold mb-1 flex items-center gap-2 text-base text-[var(--foreground)]">
+                <UserPlus className="w-4 h-4 text-[#E25C80]" />
+                Invite someone
+              </h2>
+              <p className="text-xs text-[var(--foreground)]/60 mb-4">
+                They&apos;ll be added when they sign up with the same email.
+              </p>
+
+              <form action={formAction} className="space-y-3.5" data-invite-form>
+                <div>
+                  <Label htmlFor="email">Email address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/40" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      placeholder="grandma@example.com"
+                      className="pl-11"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="role">Role</Label>
+                  <Select id="role" name="role" defaultValue="viewer">
+                    <option value="viewer">Viewer — can see everything</option>
+                    <option value="editor">
+                      Editor — can add memories & content
+                    </option>
+                  </Select>
+                </div>
+
+                {ok && newInviteLink && (
+                  <div className="rounded-2xl border border-green-200 bg-green-50 px-3.5 py-3 space-y-2">
+                    <p className="text-sm text-green-800 font-semibold">
+                      Invitation ready for {newInviteLink.email || "them"}!
+                    </p>
+                    <p className="text-xs text-green-700/80 break-all font-mono">
+                      {newInviteLink.link}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(newInviteLink.link);
+                        setCopiedNew(true);
+                        setTimeout(() => setCopiedNew(false), 2000);
+                      }}
+                    >
+                      {copiedNew ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                      {copiedNew ? "Copied!" : "Copy invite link"}
+                    </Button>
+                  </div>
+                )}
+                {state && !state.ok && (
+                  <p className="text-sm text-red-700 bg-red-50 rounded-xl px-3 py-2">
+                    {state.error}
+                  </p>
+                )}
+
+                <Button type="submit" disabled={pending} className="w-full">
+                  {pending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <UserPlus className="w-4 h-4" />
+                  )}
+                  Send invite
+                </Button>
+              </form>
+            </Card>
+          )}
+
+          {/* Role legend */}
+          <Card className="p-6 bg-white rounded-3xl border border-[var(--border)] shadow-xs">
+            <h3 className="font-semibold mb-3 text-sm text-[var(--foreground)]">Roles explained</h3>
+            <div className="space-y-2.5 text-xs text-[var(--foreground)]/75">
+              {(["owner", "editor", "viewer"] as UserRole[]).map((r) => (
+                <div key={r} className="flex items-start gap-2">
+                  <span className="font-bold capitalize text-[var(--foreground)] mt-0.5 min-w-[3.5rem]">
+                    {r}:
+                  </span>
+                  <span className="leading-relaxed">{ROLE_DESCRIPTIONS[r]}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

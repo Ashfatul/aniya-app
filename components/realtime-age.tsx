@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { calculateAgeBreakdown, formatDate, type AgeBreakdown } from "@/lib/utils";
-import { Clock, Calendar, Sparkles, Heart, Activity, ArrowUpRight } from "lucide-react";
+import { Clock, Calendar, Sparkles, Heart, Activity } from "lucide-react";
 
 interface RealtimeAgeProps {
   birthday: string | null | undefined;
@@ -49,7 +49,7 @@ export function RealtimeAge({
   // 1. Badge variant (for TopBar)
   if (variant === "badge") {
     return (
-      <span className={`inline-flex items-center gap-1 font-medium ${className}`}>
+      <span className={`inline-flex items-center gap-1 font-medium truncate ${className}`}>
         {formatAgeSummary(age)} old
       </span>
     );
@@ -58,7 +58,7 @@ export function RealtimeAge({
   // 2. Inline variant
   if (variant === "inline") {
     return (
-      <span className={`inline-flex items-center gap-1 font-medium ${className}`}>
+      <span className={`inline-flex items-center gap-1 font-medium truncate ${className}`}>
         {formatAgeSummary(age)}
       </span>
     );
@@ -68,7 +68,7 @@ export function RealtimeAge({
   if (variant === "profile-hero") {
     return (
       <div className={`space-y-3 ${className}`}>
-        <p className="text-white/95 text-sm flex items-center justify-center gap-1.5 flex-wrap font-medium">
+        <p className="text-white/95 text-xs sm:text-sm flex items-center justify-center gap-1.5 flex-wrap font-medium">
           <span>Born {formatDate(birthday)}</span>
           <span className="opacity-60">·</span>
           <span className="font-bold text-white underline decoration-white/40 underline-offset-4">
@@ -77,7 +77,7 @@ export function RealtimeAge({
         </p>
 
         {/* Live ticking micro-strip */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-xs font-semibold text-white border border-white/30 shadow-sm">
+        <div className="inline-flex items-center gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-white/20 backdrop-blur-md text-[11px] sm:text-xs font-semibold text-white border border-white/30 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
           <span className="tracking-wide">
             {padZero(age.hours)}h {padZero(age.minutes)}m {padZero(age.seconds)}s live
@@ -92,22 +92,21 @@ export function RealtimeAge({
     const hasYears = age.years > 0;
 
     return (
-      <section className={`relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#E25C80] via-[#E86B88] to-[#F59074] p-5 sm:p-7 text-white shadow-xl shadow-rose-900/10 border border-white/25 ${className}`}>
+      <section className={`relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#E25C80] via-[#E86B88] to-[#F59074] p-4 sm:p-7 text-white shadow-xl shadow-rose-900/10 border border-white/25 w-full ${className}`}>
         {/* Soft atmospheric ambient light orbs */}
         <div className="pointer-events-none absolute -top-12 -right-12 w-48 h-48 bg-white/20 rounded-full blur-3xl" />
         <div className="pointer-events-none absolute -bottom-12 -left-12 w-48 h-48 bg-amber-300/20 rounded-full blur-3xl" />
-        <div className="pointer-events-none absolute top-1/2 right-1/4 w-32 h-32 bg-pink-300/15 rounded-full blur-2xl" />
 
-        <div className="relative z-10 space-y-4 sm:space-y-5">
+        <div className="relative z-10 space-y-3.5 sm:space-y-5">
           {/* Top Bar: Pill Badges */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-[11px] font-semibold tracking-wide uppercase shadow-xs">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-[10px] sm:text-[11px] font-semibold tracking-wide uppercase shadow-xs">
               <span>🌸</span>
               <span>Today&apos;s Story</span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-semibold shadow-xs">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-semibold shadow-xs">
                 <Heart className="w-3.5 h-3.5 fill-white text-white" />
                 <span>{totalMemories ?? 0}</span>
                 <span className="opacity-80 font-normal">memories</span>
@@ -121,31 +120,31 @@ export function RealtimeAge({
 
           {/* Greeting & Headline */}
           <div>
-            <h1 className="font-script text-4xl sm:text-5xl font-bold tracking-wide text-white drop-shadow-sm leading-tight">
+            <h1 className="font-script text-3xl sm:text-5xl font-bold tracking-wide text-white drop-shadow-sm leading-tight truncate">
               Hello, {babyName || "Little One"}
             </h1>
-            <p className="text-white/90 text-sm sm:text-base font-medium mt-1 flex items-center gap-2 flex-wrap">
-              <span>✨ {formatAgeSummary(age)} of pure wonder</span>
+            <p className="text-white/90 text-xs sm:text-base font-medium mt-1 flex items-center gap-2 flex-wrap">
+              <span>✨ {formatAgeSummary(age)} of wonder</span>
               <span className="opacity-60 hidden sm:inline">·</span>
               <span className="text-xs opacity-85 hidden sm:inline">Day {age.totalDays.toLocaleString()} on Earth</span>
             </p>
           </div>
 
           {/* Realtime Live Counter Card */}
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 border border-white/35 shadow-lg shadow-black/5 space-y-3">
+          <div className="bg-white/20 backdrop-blur-md rounded-2xl p-2.5 sm:p-4 border border-white/35 shadow-lg shadow-black/5 space-y-2.5 sm:space-y-3 w-full overflow-hidden">
             <div className="flex items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
                 </span>
-                <span className="font-bold tracking-wider uppercase text-[11px] text-white">
+                <span className="font-bold tracking-wider uppercase text-[10px] sm:text-[11px] text-white">
                   Realtime Age
                 </span>
               </div>
 
               {age.nextMilestoneDays != null && (
-                <div className="text-[11px] text-white/90 font-medium bg-white/15 px-2.5 py-0.5 rounded-full border border-white/20">
+                <div className="text-[10px] sm:text-[11px] text-white/90 font-medium bg-white/15 px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-full border border-white/20 truncate max-w-[170px] sm:max-w-none">
                   {age.nextMilestoneDays === 0
                     ? "Milestone today! 🎉"
                     : `${age.nextMilestoneLabel} in ${age.nextMilestoneDays}d`}
@@ -153,21 +152,21 @@ export function RealtimeAge({
               )}
             </div>
 
-            {/* Dynamic Grid: perfectly balances columns with zero empty spaces */}
+            {/* Dynamic Grid: perfectly balances columns with min-w-0 on each tile to prevent overflow */}
             <div
-              className={`grid gap-2 sm:gap-2.5 ${
+              className={`grid gap-1 sm:gap-2.5 w-full ${
                 hasYears ? "grid-cols-6" : "grid-cols-5"
               }`}
             >
               {hasYears && (
                 <HeroTile
                   value={age.years}
-                  label={age.years === 1 ? "Year" : "Years"}
+                  label={age.years === 1 ? "Yr" : "Yrs"}
                 />
               )}
               <HeroTile
                 value={age.months}
-                label={age.months === 1 ? "Month" : "Months"}
+                label={age.months === 1 ? "Mo" : "Mos"}
                 isPrimary
               />
               <HeroTile
@@ -175,11 +174,11 @@ export function RealtimeAge({
                 label={age.days === 1 ? "Day" : "Days"}
                 isPrimary
               />
-              <HeroTile value={padZero(age.hours)} label="Hours" />
-              <HeroTile value={padZero(age.minutes)} label="Mins" />
+              <HeroTile value={padZero(age.hours)} label="Hrs" />
+              <HeroTile value={padZero(age.minutes)} label="Min" />
               <HeroTile
                 value={padZero(age.seconds)}
-                label="Secs"
+                label="Sec"
                 isSeconds
               />
             </div>
@@ -191,43 +190,43 @@ export function RealtimeAge({
 
   // 5. Dedicated Card variant (for Profile page)
   return (
-    <section className={`bg-white rounded-3xl p-5 sm:p-6 border border-[var(--border)] shadow-sm space-y-4 ${className}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#E25C80] to-[#F59074] text-white flex items-center justify-center shadow-sm">
-            <Clock className="w-5 h-5" />
+    <section className={`bg-white rounded-3xl p-4 sm:p-6 border border-[var(--border)] shadow-sm space-y-4 w-full overflow-hidden ${className}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-[#E25C80] to-[#F59074] text-white flex items-center justify-center shadow-sm flex-shrink-0">
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <h2 className="font-semibold text-[var(--foreground)] text-base leading-tight">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-[var(--foreground)] text-sm sm:text-base leading-tight truncate">
               Live Age & Milestones
             </h2>
-            <p className="text-xs text-[var(--foreground)]/60 mt-0.5">
+            <p className="text-[11px] sm:text-xs text-[var(--foreground)]/60 mt-0.5 truncate">
               Ticking live since birth
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-medium">
+        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-medium flex-shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span>Live Ticking</span>
         </div>
       </div>
 
-      {/* Main live unit grid */}
+      {/* Main live unit grid with min-w-0 */}
       <div
-        className={`grid gap-2 text-center ${
+        className={`grid gap-1.5 sm:gap-2 text-center w-full ${
           age.years > 0 ? "grid-cols-6" : "grid-cols-5"
         }`}
       >
         {age.years > 0 && (
           <ProfileTile
             value={age.years}
-            label={age.years === 1 ? "Year" : "Years"}
+            label={age.years === 1 ? "Yr" : "Yrs"}
             color="bg-rose-50 border-rose-100 text-rose-900"
           />
         )}
         <ProfileTile
           value={age.months}
-          label={age.months === 1 ? "Month" : "Months"}
+          label={age.months === 1 ? "Mo" : "Mos"}
           color="bg-pink-50 border-pink-200 text-pink-900"
           highlight
         />
@@ -239,54 +238,54 @@ export function RealtimeAge({
         />
         <ProfileTile
           value={padZero(age.hours)}
-          label="Hours"
+          label="Hrs"
           color="bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]"
         />
         <ProfileTile
           value={padZero(age.minutes)}
-          label="Mins"
+          label="Min"
           color="bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]"
         />
         <ProfileTile
           value={padZero(age.seconds)}
-          label="Secs"
+          label="Sec"
           color="bg-emerald-50 border-emerald-200 text-emerald-900 font-mono"
           isLive
         />
       </div>
 
       {/* Breakdown stat pills */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
-        <div className="p-3.5 rounded-2xl bg-[var(--muted)]/70 border border-[var(--border)] text-left">
-          <div className="text-[11px] font-medium text-[var(--foreground)]/60 flex items-center gap-1.5">
-            <Heart className="w-3.5 h-3.5 text-[#E25C80] fill-[#E25C80]" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5 pt-1">
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-[var(--muted)]/70 border border-[var(--border)] text-left min-w-0">
+          <div className="text-[10px] sm:text-[11px] font-medium text-[var(--foreground)]/60 flex items-center gap-1.5 truncate">
+            <Heart className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#E25C80] fill-[#E25C80] flex-shrink-0" />
             Total Days
           </div>
-          <div className="font-bold text-lg mt-0.5 text-[var(--foreground)]">
-            {age.totalDays.toLocaleString()} days
+          <div className="font-bold text-base sm:text-lg mt-0.5 text-[var(--foreground)] truncate">
+            {age.totalDays.toLocaleString()} d
           </div>
         </div>
 
-        <div className="p-3.5 rounded-2xl bg-[var(--muted)]/70 border border-[var(--border)] text-left">
-          <div className="text-[11px] font-medium text-[var(--foreground)]/60 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-[var(--muted)]/70 border border-[var(--border)] text-left min-w-0">
+          <div className="text-[10px] sm:text-[11px] font-medium text-[var(--foreground)]/60 flex items-center gap-1.5 truncate">
+            <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500 flex-shrink-0" />
             Total Weeks
           </div>
-          <div className="font-bold text-lg mt-0.5 text-[var(--foreground)]">
-            {age.totalWeeks.toLocaleString()} weeks
+          <div className="font-bold text-base sm:text-lg mt-0.5 text-[var(--foreground)] truncate">
+            {age.totalWeeks.toLocaleString()} w
           </div>
         </div>
 
         {age.nextMilestoneDays != null && (
-          <div className="p-3.5 rounded-2xl bg-[var(--muted)]/70 border border-[var(--border)] text-left col-span-2 sm:col-span-1">
-            <div className="text-[11px] font-medium text-[var(--foreground)]/60 flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-blue-500" />
+          <div className="p-3 sm:p-3.5 rounded-2xl bg-[var(--muted)]/70 border border-[var(--border)] text-left col-span-2 sm:col-span-1 min-w-0">
+            <div className="text-[10px] sm:text-[11px] font-medium text-[var(--foreground)]/60 flex items-center gap-1.5 truncate">
+              <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500 flex-shrink-0" />
               Next Milestone
             </div>
-            <div className="font-bold text-sm mt-0.5 text-[var(--foreground)] truncate">
+            <div className="font-bold text-xs sm:text-sm mt-0.5 text-[var(--foreground)] truncate">
               {age.nextMilestoneDays === 0
                 ? "Today! 🎉"
-                : `In ${age.nextMilestoneDays} days (${age.nextMilestoneLabel})`}
+                : `${age.nextMilestoneDays}d (${age.nextMilestoneLabel})`}
             </div>
           </div>
         )}
@@ -308,7 +307,7 @@ function HeroTile({
 }) {
   return (
     <div
-      className={`rounded-xl py-2 px-1 sm:py-2.5 sm:px-2 flex flex-col items-center justify-center transition-all ${
+      className={`min-w-0 rounded-xl py-1.5 px-0.5 sm:py-2.5 sm:px-2 flex flex-col items-center justify-center transition-all ${
         isPrimary
           ? "bg-white/35 backdrop-blur-md border border-white/60 text-white shadow-sm font-black"
           : isSeconds
@@ -316,10 +315,10 @@ function HeroTile({
           : "bg-white/20 backdrop-blur-sm border border-white/30 text-white"
       }`}
     >
-      <div className="text-xl sm:text-2xl font-black leading-none tracking-tight">
+      <div className="text-base sm:text-2xl font-black leading-none tracking-tight">
         {value}
       </div>
-      <div className="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold opacity-90 mt-1">
+      <div className="text-[9px] sm:text-[11px] uppercase tracking-wider font-bold opacity-90 mt-0.5 sm:mt-1 truncate max-w-full">
         {label}
       </div>
     </div>
@@ -341,12 +340,12 @@ function ProfileTile({
 }) {
   return (
     <div
-      className={`rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center border transition-colors ${color}`}
+      className={`min-w-0 rounded-xl sm:rounded-2xl p-1.5 sm:p-3 flex flex-col items-center justify-center border transition-colors ${color}`}
     >
-      <div className="text-lg sm:text-xl font-bold leading-none tracking-tight">
+      <div className="text-base sm:text-xl font-bold leading-none tracking-tight">
         {value}
       </div>
-      <div className="text-[10px] uppercase tracking-wider opacity-75 mt-1 font-semibold">
+      <div className="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-75 mt-0.5 sm:mt-1 font-semibold truncate max-w-full">
         {label}
       </div>
     </div>

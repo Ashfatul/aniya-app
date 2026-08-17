@@ -37,11 +37,13 @@ export default async function AddMomentPage({
   const initialModule = (params.module as any) || "memory";
 
   return (
-    <div className="space-y-5">
+    <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="font-script text-3xl">Add a moment</h1>
-        <p className="text-sm text-[var(--foreground)]/60">
-          Choose what to capture — you can update anything later.
+        <h1 className="font-script text-4xl font-bold text-[var(--foreground)]">
+          Add a moment
+        </h1>
+        <p className="text-sm text-[var(--foreground)]/65 mt-1">
+          Choose what to capture — you can update or attach photos anytime.
         </p>
       </div>
       <AddMomentForm initialModule={initialModule} familyId={familyId} />

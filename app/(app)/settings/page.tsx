@@ -19,8 +19,8 @@ export default async function SettingsPage() {
     .maybeSingle();
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-script text-3xl">Settings</h1>
+    <div className="max-w-2xl mx-auto space-y-6">
+      <h1 className="font-script text-3xl font-bold">Settings</h1>
 
       <section className="bg-white rounded-2xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
         <Row

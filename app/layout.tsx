@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Caveat } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import { NavigationSplash } from "@/components/navigation-splash";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -54,6 +55,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-soft-gradient">
         <NextTopLoader color="#f4a5b8" showSpinner={false} />
+        <NavigationSplash />
         <ServiceWorkerRegister />
         <PWAInstallPrompt />
         {children}
