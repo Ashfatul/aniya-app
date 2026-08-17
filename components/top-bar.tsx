@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { LogOut, ChevronDown } from "lucide-react";
 import type { Family, Profile, UserRole } from "@/lib/types";
-import { formatAge } from "@/lib/utils";
+import { RealtimeAge } from "@/components/realtime-age";
 
 export function TopBar({
   family,
@@ -26,11 +26,6 @@ export function TopBar({
     router.push("/login");
     router.refresh();
   }
-
-  const age =
-    family.baby_birthday && !isNaN(new Date(family.baby_birthday).getTime())
-      ? formatAge(family.baby_birthday)
-      : null;
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-[var(--border)]">
@@ -52,9 +47,12 @@ export function TopBar({
             <div className="font-script text-xl text-[var(--primary-dark)]">
               {family.baby_name}
             </div>
-            {age && (
-              <div className="text-[11px] text-[var(--foreground)]/50 -mt-0.5">
-                {age} old
+            {family.baby_birthday && (
+              <div className="text-[11px] text-[var(--foreground)]/60 -mt-0.5">
+                <RealtimeAge
+                  birthday={family.baby_birthday}
+                  variant="badge"
+                />
               </div>
             )}
           </div>

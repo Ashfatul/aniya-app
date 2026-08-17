@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Family, Profile, TimelineItem } from "@/lib/types";
 import { ProfileEditor } from "./profile-editor";
-import { formatAge, formatDate } from "@/lib/utils";
+import { RealtimeAge } from "@/components/realtime-age";
 import {
   Camera,
   Ruler,
@@ -68,34 +68,48 @@ export default async function ProfilePage() {
   return (
     <div className="space-y-6">
       {/* Profile header */}
-      <section className="bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] rounded-3xl p-6 text-white text-center shadow-md">
-        <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-white shadow-lg bg-[var(--accent-3)] flex items-center justify-center">
-          {family.baby_photo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={family.baby_photo_url}
-              alt={family.baby_name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="text-3xl font-script">
-              {family.baby_name.charAt(0).toUpperCase()}
-            </span>
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#E25C80] via-[#E86B88] to-[#F59074] rounded-3xl p-6 sm:p-7 text-white text-center shadow-xl shadow-rose-900/10 border border-white/20">
+        <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-10 -left-10 w-40 h-40 bg-amber-300/20 rounded-full blur-2xl" />
+
+        <div className="relative z-10">
+          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-white/90 shadow-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+            {family.baby_photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={family.baby_photo_url}
+                alt={family.baby_name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-3xl font-script font-bold text-white">
+                {family.baby_name.charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
+          <h1 className="font-script text-4xl sm:text-5xl font-bold mt-3 text-white drop-shadow-sm">
+            {family.baby_name}
+          </h1>
+          {family.baby_birthday && (
+            <div className="mt-2">
+              <RealtimeAge
+                birthday={family.baby_birthday}
+                variant="profile-hero"
+              />
+            </div>
+          )}
+          {family.baby_bio && (
+            <p className="text-white/90 mt-3 text-sm max-w-md mx-auto leading-relaxed">
+              {family.baby_bio}
+            </p>
           )}
         </div>
-        <h1 className="font-script text-4xl mt-3">{family.baby_name}</h1>
-        {family.baby_birthday && (
-          <p className="opacity-90 mt-1 text-sm">
-            Born {formatDate(family.baby_birthday)} ·{" "}
-            <span className="font-medium">{formatAge(family.baby_birthday)}</span>
-          </p>
-        )}
-        {family.baby_bio && (
-          <p className="opacity-90 mt-3 text-sm max-w-md mx-auto">
-            {family.baby_bio}
-          </p>
-        )}
       </section>
+
+      {/* Realtime live age & milestones card */}
+      {family.baby_birthday && (
+        <RealtimeAge birthday={family.baby_birthday} variant="card" />
+      )}
 
       {/* Quick stats */}
       <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">

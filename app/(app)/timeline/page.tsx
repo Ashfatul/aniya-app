@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { Camera, Plus, Heart, Calendar, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import type { TimelineItem, Family } from "@/lib/types";
-import { formatAge, groupByDate, formatTime } from "@/lib/utils";
+import { groupByDate, formatTime } from "@/lib/utils";
 import { ModuleIcon, ModuleColor } from "@/components/module-icon";
 import { Button } from "@/components/ui/button";
+import { RealtimeAge } from "@/components/realtime-age";
 
 export const dynamic = "force-dynamic";
 
@@ -39,31 +40,13 @@ export default async function TimelinePage() {
 
   return (
     <div className="space-y-6">
-      {/* Hero / stats strip */}
-      <section className="bg-gradient-to-br from-[var(--accent-3)] to-[var(--primary)] rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="absolute top-0 right-0 opacity-20 text-9xl">🌸</div>
-        <div className="relative">
-          <div className="text-xs uppercase tracking-wide opacity-90">
-            Today
-          </div>
-          <h1 className="font-script text-5xl mt-1">
-            Hello, {family.baby_name}
-          </h1>
-          {family.baby_birthday && (
-            <p className="opacity-90 mt-1 flex items-center gap-2 text-sm">
-              <Calendar className="w-4 h-4" />
-              {formatAge(family.baby_birthday)} of beautiful memories
-            </p>
-          )}
-          <div className="flex items-center gap-4 mt-4 text-sm">
-            <div className="flex items-center gap-1.5">
-              <Heart className="w-4 h-4 fill-white" />
-              <span className="font-medium">{totalCount}</span>
-              <span className="opacity-80">memories</span>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Hero / stats banner */}
+      <RealtimeAge
+        birthday={family.baby_birthday}
+        babyName={family.baby_name}
+        totalMemories={totalCount}
+        variant="hero"
+      />
 
       {/* Quick add */}
       <div className="flex items-center justify-between">
@@ -148,16 +131,16 @@ function TimelineCard({ item }: { item: TimelineItem }) {
       className="block bg-white rounded-2xl border border-[var(--border)] overflow-hidden hover:shadow-md transition-shadow fade-up"
     >
       {item.media_urls?.[0] && (
-        <div className="aspect-video bg-[var(--muted)] overflow-hidden relative">
+        <div className="aspect-square w-full bg-[var(--muted)] overflow-hidden relative flex items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={item.media_urls[0]}
             alt={item.title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-center"
           />
           {item.media_urls.length > 1 && (
-            <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/60 text-white text-xs flex items-center gap-1">
-              <Camera className="w-3 h-3" />
+            <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs font-medium flex items-center gap-1.5 shadow-sm">
+              <Camera className="w-3.5 h-3.5" />
               {item.media_urls.length}
             </div>
           )}

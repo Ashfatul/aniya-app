@@ -19,7 +19,6 @@ const geistMono = Geist_Mono({
 const caveat = Caveat({
   variable: "--font-script",
   subsets: ["latin"],
-  weight: ["500", "700"],
 });
 
 export const metadata: Metadata = {
